@@ -16,24 +16,19 @@ def ocr():
     file.save(img_path)
 
     try:
-        # SSOCRのオプションを調整：
-        # -d -1: 桁数自動
-        # -D: 行全体のデバッグ表示を抑制
-        # -f white: 黒背景に白文字として処理（2値化済みなので）
-        # -S: 数字のみ（小数点やカンマをスキップして結合）
-        # omit_decimal: 小数点を無視する（秤の0.1gのドット対策）
+        # 修正ポイント: 
+        # -m 1: 膨張処理（文字を太らせて隙間を埋める）
+        # -T: 反転（2値化後の白黒が逆の場合の保険、今回は不要ですが指定を安定させます）
+        # -S: 数字のみ結合
         process = subprocess.run(
-            ['ssocr', '-d', '-1', '-S', 'omit_decimal', 'threshold', '128', img_path],
+            ['ssocr', '-d', '-1', '-S', 'omit_decimal', '-m', '1', 'threshold', '128', img_path],
             capture_output=True,
             text=True
         )
         
-        # 読み取った文字列から数字以外（もしあれば）を除去
+        # 不要な文字を除去して数字だけ抽出
         raw_output = process.stdout.strip()
         number_str = "".join(filter(str.isdigit, raw_output))
-        
-        # 小数点以下の桁がある秤（0.0g表記）の場合は、ここで調整が必要です。
-        # 今回は整数（g単位）として処理します。
         
         if not number_str:
             return jsonify({"number": None, "status": "no_digits"}), 200
