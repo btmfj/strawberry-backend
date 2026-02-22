@@ -16,28 +16,33 @@ def ocr():
     file.save(img_path)
 
     try:
-        # 修正: subprocess.run を使い、終了コードを無視して出力を取得する
-        # -d -1 は桁数を自動認識させる
+        # SSOCRのオプションを調整：
+        # -d -1: 桁数自動
+        # -D: 行全体のデバッグ表示を抑制
+        # -f white: 黒背景に白文字として処理（2値化済みなので）
+        # -S: 数字のみ（小数点やカンマをスキップして結合）
+        # omit_decimal: 小数点を無視する（秤の0.1gのドット対策）
         process = subprocess.run(
-            ['ssocr', '-d', '-1', 'threshold', '128', img_path],
+            ['ssocr', '-d', '-1', '-S', 'omit_decimal', 'threshold', '128', img_path],
             capture_output=True,
             text=True
         )
         
-        # 標準出力から読み取った数字を取得
-        number_str = process.stdout.strip()
+        # 読み取った文字列から数字以外（もしあれば）を除去
+        raw_output = process.stdout.strip()
+        number_str = "".join(filter(str.isdigit, raw_output))
         
-        # SSOCRが何も出力しなかった場合
+        # 小数点以下の桁がある秤（0.0g表記）の場合は、ここで調整が必要です。
+        # 今回は整数（g単位）として処理します。
+        
         if not number_str:
-            return jsonify({"number": None, "status": "no_digits_found"}), 200
+            return jsonify({"number": None, "status": "no_digits"}), 200
             
         return jsonify({"number": number_str})
         
     except Exception as e:
-        # システムエラー（ssocr未インストール等）
         return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
-    # Renderのポート指定に対応
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port)
